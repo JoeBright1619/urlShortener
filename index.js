@@ -1,56 +1,178 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const app = express();
 const bodyParser = require('body-parser');
+const dns = require('dns');
+const checkURL = require('./test.js')
 
-// Basic Configuration
+const app = express();
+const mongoose = require('mongoose');
 const port = process.env.PORT || 3000;
 
-app.use(bodyParser.urlencoded({ extended: true }));
-
+// Middleware
 app.use(cors());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
+// Static files
 app.use('/public', express.static(`${process.cwd()}/public`));
 
-app.get('/', function(req, res) {
-  res.sendFile(process.cwd() + '/views/index.html');
+// Homepage
+app.get('/', (req, res) => {
+  res.sendFile(`${process.cwd()}/views/index.html`);
 });
 
-var urlArr = [];
-// Your first API endpoint
-app.post('/api/shorturl', function(req, res) {
+// URL array (for demonstration, replace with database)
+const urlArr = [];
+// database
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('MongoDB Connected'))
+  .catch(err => console.log('MongoDB Connection Error:', err));
+
+  const urlSchema = new mongoose.Schema({
+    url: {
+      type: String,
+      required: true
+    },
+    shorturl: {
+      type: Number,
+      required: true
+    }
+  });
+
+  const urlModel = mongoose.model('url', urlSchema);
+
+   const finding = ( prop, value, callback)=>{ 
+     var query ={};
+     if(value==""){
+     }
+     else{
+     query[prop]= value;
+     }
+     urlModel.find(query)
+   .then((user)=>{
+     callback(null, user);
+   })
+   .catch((err)=>{
+     callback(err, null);
+   });
+   }
+ 
+   const creating = (url, shorten, callback) =>{
+     var urlcreate = new urlModel({
+         url: url,
+         shorturl: shorten
+     });
+     urlcreate.save()
+         .then((done)=>{
+             callback(null,done)
+         })
+         .catch((err)=>{
+             callback(err,null)
+         })
+         
+     }
+
+// API endpoint to create short URLs
+app.post('/api/shorturl', (req, res) => {
+  const { url } = req.body;
+var urlFull= new URL(url);
+checkURL(urlFull,(isValid)=>{
+  if (isValid) {
+    //finding the url in the database
+    finding("url",url,(err,data)=>{
+      if(err){
+          console.log("there was an error encoutered while finding url( "+url+" ): "+ err);
+      }
+      else{
+          if( data.length==0){
+            console.log("no data available in the database");
+
+             finding("url","",(err, found)=>{
+               if(err){
+                 console.log("error while retrieving the number of all the urls in database with error :"+ err)
+               }
+               else{
+                 var urlShortId = found.length;
+                 console.log("number of all the urls in database is : "+ urlShortId);
+                 
+                 creating(url, urlShortId, (err, inserted)=>{
+                  if(err){
+                    console.log("inserting the new url has failed due to error :"+ err);
+                  }
+                  else{
+                    console.log(`successfully inserted url {original:${inserted}, short:${urlShortId+1}}`);
+                  }
+                 });
+
+                 res.json({
+                  original_url: url,
+                  short_url: urlShortId + 1
+                })
+
+               }
+             });
+           
+      
+          }
+          else{
+           
+            console.log(`data already available and extracted as: `+ data);
+            res.json({
+              original_url: data[0].url,
+              short_url: data[0].shorturl
+            })
+          }
+      }
+    })
+
   
-  const url = req.body.url
+  
+  } else {
+    console.log("yap!! the url is invalid")
+    res.json({ error: "Invalid URL" });
+  }
+});
 
-  if(/http:\/\/www\..+\.com/.test(url)){
-   // res.send({ URL: url});
-    console.log(`URL: ${url}`)
+});
 
-  var hasObj = urlArr.find(item=>item.url==url);
-    if(hasObj){
-      res.send({
-        original_url: hasObj.url,
-        short_url: hasObj.id
-      })
-      console.log(hasObj.id)
-    }
-    else{
-      urlArr.push({
-        url: url,
-        id: urlArr.length + 1
-      })
-      console.log(urlArr)
-    }
+// API endpoint to redirect short URLs
+app.get('/api/shorturl/:short', (req, res) => {
+  const short = parseInt(req.params.short);
+  if(isNaN(short) || short==0){
+    res.json({"error":"Wrong format"});
   }
   else{
-    console.log("error: url notfound")
-  }
-  
-});
+  finding("shorturl", short,(err, found)=>{
+    if(err){
+      console.log("error while retrieving the number of all the urls in database with error :"+ err)
+    }
+    else{
+      if(found.length==0){
+        console.log("the url path with the shorturl '"+short+"' does not exist");
+        res.status(404).json({ "error":"No short URL found for the given input" });
+      }
+    else if(found.length==1){
+        console.log("found the url details of shorturl '"+short+"' and it's "+ found[0].url);
+        res.redirect(found[0].url);
+    }
+    else{
+      console.log("there is a duplicate of urls with the same shorturl:"+ found);
+      res.json({
+        "error" : "multiple urls sharing the same shorturl"
+      })
+    }
+    }
+  });
 
-app.listen(port, function() {
-  console.log(`Listening on port ${port}`);
-  const random = Math.random();
-  console.log(urlArr)
+ 
+  }
+  }
+);
+
+
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
