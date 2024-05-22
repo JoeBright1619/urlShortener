@@ -1,6 +1,5 @@
 const dns = require('dns')
 
-var urlFull = new URL("https://www.instagram.com");
 const checkURL=(urlFull, callback)=>{
 
 console.log(urlFull);
@@ -10,22 +9,22 @@ if(urlFull.origin == 'null'){
 }
 
 else{
-    dns.lookup(urlFull.host,(err,done)=>{
+    dns.lookup(urlFull.host,(err,done,family)=>{
         if(err){
             console.log(`encountered an error!!! ${err}`)
             callback(false);
         }
         else{
             console.log(`the website is legit and it's IP is ${done}`)
+            console.log("the family:"+family)
             callback(true);
         }
     })
     }
 }
-/*
-checkURL(urlFull,(checked)=>{
+
+/*checkURL(urlFull,(checked)=>{
     if(checked){
-        console.log(urlFull)
     }
     else{
        

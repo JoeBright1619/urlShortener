@@ -10,10 +10,11 @@ const mongoose = require('mongoose');
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
 
+app.use(express.urlencoded({ extended: false }));
+app.use(express.json());
+
+app.use(cors());
 // Static files
 app.use('/public', express.static(`${process.cwd()}/public`));
 
@@ -61,7 +62,7 @@ mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopol
    const creating = (url, shorten, callback) =>{
      var urlcreate = new urlModel({
          url: url,
-         shorturl: shorten
+         shorturl: shorten + 1
      });
      urlcreate.save()
          .then((done)=>{
@@ -80,9 +81,9 @@ var urlFull= new URL(url);
 checkURL(urlFull,(isValid)=>{
   if (isValid) {
     //finding the url in the database
-    finding("url",url,(err,data)=>{
+    finding("url",urlFull.href,(err,data)=>{
       if(err){
-          console.log("there was an error encoutered while finding url( "+url+" ): "+ err);
+          console.log("there was an error encoutered while finding url( "+urlFull.href+" ): "+ err);
       }
       else{
           if( data.length==0){
@@ -96,12 +97,12 @@ checkURL(urlFull,(isValid)=>{
                  var urlShortId = found.length;
                  console.log("number of all the urls in database is : "+ urlShortId);
                  
-                 creating(url, urlShortId, (err, inserted)=>{
+                 creating(urlFull.href, urlShortId, (err, inserted)=>{
                   if(err){
                     console.log("inserting the new url has failed due to error :"+ err);
                   }
                   else{
-                    console.log(`successfully inserted url {original:${inserted}, short:${urlShortId+1}}`);
+                    console.log(`successfully inserted url ${inserted}`);
                   }
                  });
 
@@ -119,7 +120,7 @@ checkURL(urlFull,(isValid)=>{
            
             console.log(`data already available and extracted as: `+ data);
             res.json({
-              original_url: data[0].url,
+              original_url: url,
               short_url: data[0].shorturl
             })
           }
@@ -138,9 +139,11 @@ checkURL(urlFull,(isValid)=>{
 
 // API endpoint to redirect short URLs
 app.get('/api/shorturl/:short', (req, res) => {
-  const short = parseInt(req.params.short);
+  const short = req.params.short;
+  console.log("I just redirected!!!")
   if(isNaN(short) || short==0){
     res.json({"error":"Wrong format"});
+    console.log("wrong format!!!!"+short+" is not allowed" )
   }
   else{
   finding("shorturl", short,(err, found)=>{
@@ -150,7 +153,7 @@ app.get('/api/shorturl/:short', (req, res) => {
     else{
       if(found.length==0){
         console.log("the url path with the shorturl '"+short+"' does not exist");
-        res.status(404).json({ "error":"No short URL found for the given input" });
+        res.json({ "error":"No short URL found for the given input" });
       }
     else if(found.length==1){
         console.log("found the url details of shorturl '"+short+"' and it's "+ found[0].url);
