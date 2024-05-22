@@ -2,7 +2,7 @@ const dns = require('dns')
 
 const checkURL=(urlFull, callback)=>{
 
-console.log(urlFull);
+//console.log(urlFull);
 if(urlFull.origin == 'null'){
     console.log("url has no origin")
     callback(false)
@@ -16,7 +16,7 @@ else{
         }
         else{
             console.log(`the website is legit and it's IP is ${done}`)
-            console.log("the family:"+family)
+           
             callback(true);
         }
     })
